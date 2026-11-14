@@ -2,7 +2,7 @@
 
 Prototype : une API Node.js qui lit l'historique Git d'un dépôt et un frontend Vue 3 qui affiche les commits.
 
-> État actuel : le backend expose un seul point d'entrée (`GET /api/commits`, les 20 derniers commits) et le frontend les affiche sous forme de liste. La vraie timeline interactive reste à faire.
+> État actuel : l'API expose les branches et les commits paginés d'un dépôt, le frontend affiche la liste avec sélecteur de branche, filtre et "Charger plus". La visualisation graphique des branches et merges reste à faire.
 
 ## Stack
 
@@ -20,10 +20,28 @@ npm install --prefix frontend
 npm run dev
 ```
 
-Le backend écoute sur http://localhost:3000. Il lit l'historique du dépôt parent du dossier `backend/`.
+Le backend écoute sur http://localhost:3000. Par défaut il lit le dépôt parent du dossier `backend/` ; pour en analyser un autre :
+
+```bash
+REPO_PATH=/chemin/vers/un/depot npm run dev
+```
+
+Le chemin est fixé au démarrage : l'API n'accepte aucun chemin envoyé par le client, pour ne pas exposer d'autres dossiers de la machine.
+
+## API
+
+- `GET /api/branches` : `{ current, branches }`
+- `GET /api/commits?ref=<branche>&limit=<1-100>&skip=<n>` : `{ branch, hasMore, commits }`. `ref` doit être une branche existante, sinon 400.
+
+## Tests
+
+```bash
+npm test --prefix backend
+```
+
+Les tests construisent un dépôt Git temporaire avec isomorphic-git et appellent l'API réelle (pagination, autre branche, paramètres invalides).
 
 ## À faire
 
-- Choisir le dépôt à analyser au lieu de lire le dépôt courant
-- Pagination au-delà de 20 commits
 - Vraie visualisation (branches, merges)
+- Changer de dépôt depuis l'interface

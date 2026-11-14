@@ -1,39 +1,46 @@
 const express = require('express');
 const cors = require('cors');
-const git = require('isomorphic-git');
-const fs = require('fs');
 const path = require('path');
+const { listBranches, currentBranch, listCommits } = require('./git');
 
-const app = express();
-const PORT = 3000;
+/**
+ * Crée l'application Express pour un dépôt donné.
+ * Le dépôt est fixé au démarrage (variable REPO_PATH) : l'API n'accepte aucun chemin du client,
+ * pour ne pas pouvoir lire d'autres dossiers de la machine.
+ */
+function createApp(repoPath) {
+  const app = express();
+  app.use(cors());
 
-// ✅ Autoriser toutes les origines (simple pour dev)
-app.use(cors());
+  app.get('/api/branches', async (req, res) => {
+    try {
+      res.json({ current: await currentBranch(repoPath), branches: await listBranches(repoPath) });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Impossible de lire les branches' });
+    }
+  });
 
-const repoPath = path.join(__dirname, '..');
+  app.get('/api/commits', async (req, res) => {
+    try {
+      const { ref, limit, skip } = req.query;
+      res.json(await listCommits(repoPath, { ref, limit, skip }));
+    } catch (err) {
+      if (err.status === 400) return res.status(400).json({ error: err.message });
+      console.error(err);
+      res.status(500).json({ error: 'Impossible de lire les commits' });
+    }
+  });
 
-app.get('/api/commits', async (req, res) => {
-  try {
-    const commits = await git.log({
-      fs,
-      dir: repoPath,
-      depth: 20 // on limite pour l'instant
-    });
+  return app;
+}
 
-    const formatted = commits.map(c => ({
-      oid: c.oid,
-      message: c.commit.message,
-      author: c.commit.author.name,
-      date: c.commit.author.timestamp * 1000
-    }));
+if (require.main === module) {
+  const PORT = process.env.PORT || 3000;
+  const repoPath = path.resolve(process.env.REPO_PATH || path.join(__dirname, '..'));
+  createApp(repoPath).listen(PORT, () => {
+    console.log(`Backend sur http://localhost:${PORT} (dépôt : ${repoPath})`);
+  });
+}
 
-    res.json(formatted);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Impossible de lire les commits' });
-  }
-});
-
-app.listen(PORT, () => {
-  console.log(`✅ Backend running on http://localhost:${PORT}`);
-});
+module.exports = { createApp };
